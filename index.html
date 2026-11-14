@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shinobi Signs</title>
+  <link rel="icon" href="data:," /> <!-- no favicon yet; avoids a 404 in the console -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- #stage keeps a fixed 16:9 aspect ratio; everything inside scales with it -->
+  <div id="stage">
+    <canvas id="game"></canvas>
+
+    <!-- HUD is plain DOM layered over the canvas (easy to style, easy to update) -->
+    <div id="hud">
+      <!-- Top-left: Player 1 HP -->
+      <div class="hp hp-left" id="hp-0">
+        <img class="hp-avatar" src="assets/fighter-shadow.png" alt="Player 1 fighter portrait" />
+        <div class="hp-details">
+          <div class="hp-name">PLAYER 1</div>
+          <div class="bar"><div class="ghost"></div><div class="fill"></div></div>
+          <div class="hp-text">100 HP</div>
+          <div class="chakra"><span>CHAKRA</span><div class="chakra-track"><i></i></div><b>0%</b></div>
+        </div>
+      </div>
+
+      <!-- Top-right: Player 2 HP -->
+      <div class="hp hp-right" id="hp-1">
+        <div class="hp-details">
+          <div class="hp-name">PLAYER 2</div>
+          <div class="bar"><div class="ghost"></div><div class="fill"></div></div>
+          <div class="hp-text">100 HP</div>
+          <div class="chakra"><span>CHAKRA</span><div class="chakra-track"><i></i></div><b>0%</b></div>
+        </div>
+        <img class="hp-avatar" src="assets/fighter-crimson.png" alt="Player 2 fighter portrait" />
+      </div>
+
+      <!-- Top-center: round / battle status -->
+      <div id="round-indicator" aria-live="polite">
+        <div class="round-number">ROUND 1 / 3</div>
+        <div class="round-wins">0 — 0</div>
+      </div>
+      <div id="status" aria-live="polite"></div>
+      <button id="open-select" class="hud-action" type="button">FIGHTER SELECT</button>
+
+      <!-- Center-bottom: required sequence (filled in from Phase 5 onward) -->
+      <div id="sequence">
+        <div class="seq-title">COMBO / DEFENSE INPUT</div>
+        <div class="seq-slots"></div>
+      </div>
+
+      <!-- Bottom-left / bottom-right: current detected sign (Phase 4 onward) -->
+      <div class="sign sign-left" id="sign-0">
+        <div class="sign-label">PLAYER 1 · CURRENT SIGN</div>
+        <div class="sign-value">—</div>
+      </div>
+      <div class="sign sign-right" id="sign-1">
+        <div class="sign-label">PLAYER 2 · CURRENT SIGN</div>
+        <div class="sign-value">—</div>
+      </div>
+
+      <!-- Top-left, under the HP bar: local player's webcam preview (Phase 2).
+           The <video> element is created by input/webcam.js and mounted into .cam-feed. -->
+      <div id="webcam-panel" class="cam-panel" data-state="idle">
+        <div class="cam-feed">
+          <div class="cam-overlay">
+            <div class="cam-overlay-title"></div>
+            <div class="cam-overlay-hint"></div>
+            <button class="cam-retry" type="button" hidden>RETRY</button>
+          </div>
+        </div>
+        <div class="cam-status"><span class="cam-dot"></span><span class="cam-status-text">CAMERA: OFF</span></div>
+        <!-- Phase 3: hand-tracking status row (only visible while the camera is connected) -->
+        <div class="cam-hand"><span class="cam-hand-dot"></span><span class="cam-hand-text">NO HAND DETECTED</span><span class="cam-hand-detail"></span><button class="cam-hand-retry" type="button" hidden>RETRY</button></div>
+        <!-- Phase 4: recognised sign (only visible while a hand is detected) -->
+        <div class="cam-sign" data-sign="none" hidden>
+          <div class="cam-sign-label">CURRENT SIGN</div>
+          <div class="cam-sign-value">UNKNOWN</div>
+          <div class="cam-sign-label">CONFIDENCE</div>
+          <div class="cam-sign-conf">—</div>
+        </div>
+        <div class="cam-stats"></div>
+      </div>
+
+      <!-- Opponent's live camera, received through the room's WebRTC media link. -->
+      <div id="opponent-webcam-panel" class="opponent-cam-panel" hidden>
+        <div class="opponent-cam-heading"><span class="opponent-cam-dot"></span> OPPONENT LIVE</div>
+        <div class="opponent-cam-feed">
+          <video id="opponent-video" autoplay playsinline muted></video>
+          <div id="opponent-cam-placeholder">WAITING FOR OPPONENT CAMERA…</div>
+        </div>
+        <div id="opponent-cam-status">VIDEO: CONNECTING…</div>
+      </div>
+
+      <!-- Phase 4 developer overlay (created/filled by ui/debugOverlay.js; hidden unless debug is on) -->
+      <pre id="sign-debug" hidden></pre>
+
+      <section id="multiplayer-panel" aria-label="Online multiplayer">
+        <div class="mp-heading"><span class="mp-live-dot"></span> TWO-PLAYER ONLINE DUEL</div>
+        <div class="mp-actions" id="mp-actions">
+          <button id="create-room" type="button">CREATE ROOM</button>
+          <span class="mp-or">OR</span>
+          <input id="join-code" type="text" inputmode="text" maxlength="6" autocomplete="off" placeholder="ROOM CODE" aria-label="Six-character room code" />
+          <button id="join-room" type="button">JOIN</button>
+        </div>
+        <div id="room-code-area" hidden>
+          <span class="mp-code-label">SHARE THIS ROOM CODE</span>
+          <strong id="room-code-value">------</strong>
+          <button id="copy-room-code" type="button">COPY CODE</button>
+        </div>
+        <div id="network-status" role="status" aria-live="polite">Offline training mode · Create a room to invite a second player</div>
+        <div class="mp-camera-notice">Online duel camera video is shared with your opponent while connected.</div>
+        <button id="leave-room" type="button" hidden>LEAVE ROOM</button>
+      </section>
+
+      <section id="combo-guide" aria-label="Combat combinations">
+        <div class="combo-heading">COMBAT COMBINATIONS</div>
+        <div><b>ATTACK</b> Snake → Tiger → Horse → Ram = Echo Clones</div>
+        <div><b>ATTACK</b> Tiger → Ram → Snake = Spiral Orb</div>
+        <div><b>ATTACK</b> Horse → Snake → Tiger = Guardian Summon</div>
+        <div><b>DEFEND</b> Ram → Tiger = Guard · Tiger → Snake → Ram = Counter</div>
+      </section>
+
+
+      <section id="fighter-select" class="experience-overlay" hidden aria-label="Fighter selection">
+        <div class="experience-card select-card">
+          <div class="eyebrow">SHINOBI SIGNS · ULTIMATE EDITION</div>
+          <h1>CHOOSE YOUR FIGHTERS</h1>
+          <p class="experience-subtitle">Lock in your warriors and choose the battlefield.</p>
+          <div class="select-columns">
+            <div class="select-side" data-side="0">
+              <h2>PLAYER 1 <span>BLUE TEAM</span></h2>
+              <div class="fighter-options">
+                <button class="fighter-option selected" data-player="0" data-fighter="shadow" type="button"><img src="assets/fighter-shadow.png" alt="Blue Shadow"><b>BLUE SHADOW</b><small>Lightning · Swift strike</small></button>
+                <button class="fighter-option" data-player="0" data-fighter="crimson" type="button"><img src="assets/fighter-crimson-cutout.png" alt="Crimson Knight"><b>CRIMSON KNIGHT</b><small>Inferno · Heavy strike</small></button>
+              </div>
+            </div>
+            <div class="select-side" data-side="1">
+              <h2>PLAYER 2 <span>RED TEAM</span></h2>
+              <div class="fighter-options">
+                <button class="fighter-option" data-player="1" data-fighter="shadow" type="button"><img src="assets/fighter-shadow.png" alt="Blue Shadow"><b>BLUE SHADOW</b><small>Lightning · Swift strike</small></button>
+                <button class="fighter-option selected" data-player="1" data-fighter="crimson" type="button"><img src="assets/fighter-crimson-cutout.png" alt="Crimson Knight"><b>CRIMSON KNIGHT</b><small>Inferno · Heavy strike</small></button>
+              </div>
+            </div>
+          </div>
+          <div class="stage-options"><span>ARENA</span><button class="stage-option selected" data-stage="valley" type="button">EMERALD VALLEY</button><button class="stage-option" data-stage="forest" type="button">MOONLIT FOREST</button></div>
+          <div class="select-footer"><span>BEST OF THREE · FIRST TO 2 ROUND WINS</span><button id="start-battle" type="button">LOCK IN & FIGHT <b>↗</b></button></div>
+        </div>
+      </section>
+
+      <section id="match-result" class="experience-overlay" hidden aria-live="assertive">
+        <div class="experience-card result-card"><div class="eyebrow">MATCH COMPLETE</div><h1 id="result-title">VICTORY</h1><p id="result-detail">THE ARENA HAS A NEW CHAMPION</p><div class="result-score" id="result-score">2 — 0</div><div class="result-actions"><button id="rematch" type="button">REMATCH</button><button id="result-select" type="button">CHANGE FIGHTERS</button></div></div>
+      </section>
+      <div id="intro-banner" aria-hidden="true"><span>SHINOBI SIGNS</span><b>FIGHT!</b></div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

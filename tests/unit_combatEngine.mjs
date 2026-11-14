@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { PlayerState } from "../src/game/playerState.js";
+import { CombatEngine } from "../src/game/combatEngine.js";
+let checks=0; const ok=(v,m)=>{checks++;assert.ok(v,m)}; const eq=(a,b,m)=>{checks++;assert.equal(a,b,m)};
+const ps=[new PlayerState(100),new PlayerState(100)], events=[];
+const c=new CombatEngine({players:ps,onEvent:e=>events.push(e)});
+eq(c.getState()[0].hp,100,"initial hp");
+eq(c.damagePlayer(1,25,"fire").amount,25,"damage applied");
+eq(ps[1].hp,75,"hp reduced");
+c.damagePlayer(1,100); eq(ps[1].hp,0,"hp clamps at zero");
+ok(!c.isAlive(1),"defeat detected");
+eq(c.damagePlayer(1,5).amount,undefined,"defeated player ignores damage");
+eq(ps[1].hp,0,"defeated hp unchanged");
+c.healPlayer(0,20); eq(ps[0].hp,100,"heal caps at max");
+c.reset(); eq(ps[0].hp,100,"reset p1"); eq(ps[1].hp,100,"reset p2");
+ok(events.some(e=>e.type==="defeated"),"defeat event emitted");
+console.log(`Phase 6 combat engine: ${checks}/${checks} passed`);
