@@ -87,6 +87,24 @@ function playIntro(withSound = true) {
   if (introTimer) clearTimeout(introTimer); introTimer = setTimeout(() => banner.classList.remove('play'), 2300);
   if (withSound) soundFx.round();
 }
+
+let finisherTimer = null;
+function playRoundFinisher(winner) {
+  const overlay = document.getElementById('round-finisher');
+  const image = document.getElementById('finisher-fighter');
+  const title = document.getElementById('finisher-title');
+  if (!overlay || !image) return;
+  image.src = selectedFighters[winner] === 'crimson'
+    ? 'assets/fighter-crimson-cutout.png'
+    : 'assets/fighter-shadow.png';
+  title.textContent = `PLAYER ${winner + 1} WINS`;
+  overlay.classList.remove('play');
+  void overlay.offsetWidth;
+  overlay.classList.add('play');
+  if (finisherTimer) clearTimeout(finisherTimer);
+  finisherTimer = setTimeout(() => overlay.classList.remove('play'), 2000);
+}
+
 function resetRoundState() {
   players.forEach((player) => player.reset());
   characters.forEach((character) => { character.defeated = false; character.attackTimer = 0; character.hitTimer = 0; character.pose = 'idle'; character.defenseTimer = 0; });
@@ -95,6 +113,7 @@ function resetRoundState() {
 function finishRound(winner) {
   if (roundTransition || matchOver) return;
   roundTransition = true;
+  playRoundFinisher(winner);
   roundWins[winner] += 1;
   characters[1 - winner].defeat();
   if (roundWins[winner] >= 2 || roundNumber >= 3) {
@@ -617,6 +636,36 @@ function frame(now) {
   characters.forEach((character) => character.draw(ctx));
   effects.draw(ctx);
   ctx.restore();
-  requestAnimationFrame(frame);
+  
+const signHelp = document.getElementById('sign-help');
+document.getElementById('open-sign-help')?.addEventListener('click', () => {
+  if (signHelp) signHelp.hidden = false;
+});
+document.getElementById('close-sign-help')?.addEventListener('click', () => {
+  if (signHelp) signHelp.hidden = true;
+});
+signHelp?.addEventListener('click', (event) => {
+  if (event.target === signHelp) signHelp.hidden = true;
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && signHelp && !signHelp.hidden) signHelp.hidden = true;
+});
+
+requestAnimationFrame(frame);
 }
+
+const signHelp = document.getElementById('sign-help');
+document.getElementById('open-sign-help')?.addEventListener('click', () => {
+  if (signHelp) signHelp.hidden = false;
+});
+document.getElementById('close-sign-help')?.addEventListener('click', () => {
+  if (signHelp) signHelp.hidden = true;
+});
+signHelp?.addEventListener('click', (event) => {
+  if (event.target === signHelp) signHelp.hidden = true;
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && signHelp && !signHelp.hidden) signHelp.hidden = true;
+});
+
 requestAnimationFrame(frame);
